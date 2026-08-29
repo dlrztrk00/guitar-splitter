@@ -1,9 +1,16 @@
 #!/bin/bash
-# Builds GuitarSplit.app into ~/Applications, so there is one icon to click.
+# Builds GuitarSplit.app into /Applications, so there is one icon to click.
 # The app is a thin launcher; all the real code stays in this folder.
+#
+# /Applications, not ~/Applications: Finder's sidebar shows the former, so an
+# app installed in the latter is effectively invisible.
 set -e
 REPO="$(cd "$(dirname "$0")" && pwd)"
-APP="$HOME/Applications/GuitarSplit.app"
+APP="/Applications/GuitarSplit.app"
+if [ ! -w /Applications ]; then
+  APP="$HOME/Applications/GuitarSplit.app"
+  echo "note: /Applications is not writable, installing to ~/Applications instead"
+fi
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"

@@ -39,8 +39,15 @@ needs Python ≤ 3.12, so a plain `pip install demucs` fails on this machine.
 
 ## Use
 
-Double-click **`GuitarSplit.command`**. It starts the app and opens your browser.
-Close the terminal window to stop it.
+```bash
+./make_app.sh
+```
+
+Puts **GuitarSplit** in your Applications folder. Double-click it — that's the
+whole interface. If it's already running it just reopens the tab instead of
+starting a second copy.
+
+`GuitarSplit.command` in this folder does the same thing without the icon.
 
 ## Why the backing track sounds like the record
 

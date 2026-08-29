@@ -39,7 +39,9 @@ __PLAYER__
 
 <h1>🎸 GuitarSplit</h1>
 <p class="sub">Upload a song. Get every instrument as its own track — mute the guitar and play it yourself.
-Everything happens on this computer; nothing is uploaded anywhere.</p>
+Everything happens on this computer; nothing is uploaded anywhere.<br>
+<span style="color:#6b615c">Drag anywhere on a waveform to move around · shift-drag to loop a section ·
+space to play, arrows to skip 5s</span></p>
 
 <div class="card" id="pick">
   <div class="drop" id="drop">
@@ -61,14 +63,16 @@ Everything happens on this computer; nothing is uploaded anywhere.</p>
 <div id="mixer"></div>
 
 <div class="card" id="save" hidden>
-  <div class="row" style="justify-content:space-between">
-    <div>
-      <strong>Download</strong>
-      <div class="muted" style="margin-top:4px">Each track has its own <em>save</em> button above.
-      This one saves exactly what you are hearing right now.</div>
-    </div>
-    <button id="dlmix">Download this mix</button>
+  <strong>Download</strong>
+  <div class="row" style="margin-top:14px">
+    <button id="dlall">Download all instruments</button>
+    <span class="muted">A folder with every instrument as its own file.</span>
   </div>
+  <div class="row" style="margin-top:12px">
+    <button id="dlmix" class="ghost">Download this mix</button>
+    <span class="muted">One file of exactly what you are hearing now.</span>
+  </div>
+  <div class="muted" style="margin-top:12px">Or use <em>save</em> on any single lane above.</div>
   <div class="muted" id="dlnote" style="margin-top:10px"></div>
 </div>
 
@@ -137,6 +141,24 @@ function show(r){
   $('#dlnote').textContent = '';
 }
 
+function saveAs(url){
+  const a = document.createElement('a'); a.href = url; a.download='';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+$('#dlall').onclick = async () => {
+  if (!result) return;
+  $('#dlall').disabled = true; $('#dlnote').textContent = 'Packing…';
+  const res = await fetch('/api/zip', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({session: result.session, song: result.song})});
+  const out = await res.json();
+  $('#dlall').disabled = false;
+  if (out.error){ $('#dlnote').innerHTML = '<span class="err">'+out.error+'</span>'; return; }
+  $('#dlnote').textContent = 'Saved. Unzip it and you get a folder of '
+    + result.played.length + ' instruments.';
+  saveAs(out.url);
+};
+
 $('#dlmix').onclick = async () => {
   if (!result) return;
   const state = window.GS_state ? JSON.parse(window.GS_state()) : null;
@@ -148,8 +170,7 @@ $('#dlmix').onclick = async () => {
   $('#dlmix').disabled = false;
   if (out.error){ $('#dlnote').innerHTML = '<span class="err">'+out.error+'</span>'; return; }
   $('#dlnote').textContent = 'Saved to your Downloads folder.';
-  const a = document.createElement('a'); a.href = out.url; a.download=''; document.body.appendChild(a);
-  a.click(); a.remove();
+  saveAs(out.url);
 };
 </script></body></html>
 """.replace("__PLAYER__", PLAYER_SCRIPT)

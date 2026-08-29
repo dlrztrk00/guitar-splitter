@@ -18,6 +18,7 @@ import time
 import traceback
 import urllib.parse
 import uuid
+import zipfile
 import webbrowser
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -157,6 +158,26 @@ def render_mix(session: str, gains: dict[str, float]) -> tuple[Path, str]:
     return path, f"{label}.flac"
 
 
+def zip_tracks(session: str, song: str) -> Path:
+    """Every instrument as its own file, in one folder.
+
+    Stored rather than deflated: FLAC is already compressed, so squeezing it
+    again just burns CPU for nothing. Each entry is inside a folder named after
+    the song, so unzipping gives a folder rather than loose files.
+    """
+    out = WORK / session
+    tracks = sorted((out / "tracks").glob("*.flac"))
+    if not tracks:
+        raise FileNotFoundError("That song is no longer loaded. Split it again.")
+
+    path = out / "stems.zip"
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as z:
+        for f in tracks:
+            label = A.TRACK_LABELS.get(f.stem, f.stem.title())
+            z.write(f, arcname=f"{song}/{label}.flac")
+    return path
+
+
 class Handler(BaseHTTPRequestHandler):
     jobs: Jobs = None  # type: ignore[assignment]
     server_version = "GuitarSplit"
@@ -233,6 +254,20 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         parsed = urllib.parse.urlparse(self.path)
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+
+        if parsed.path == "/api/zip":
+            song = A.safe_name(body.get("song") or "GuitarSplit")
+            try:
+                path = zip_tracks(body.get("session", ""), song)
+            except FileNotFoundError as exc:
+                self._json(404, {"error": str(exc)})
+                return
+            except Exception as exc:  # noqa: BLE001
+                self._json(500, {"error": f"{type(exc).__name__}: {exc}"})
+                return
+            rel = path.relative_to(WORK).as_posix()
+            self._json(200, {"url": f"/media/{rel}?name={urllib.parse.quote(song + ' - stems.zip')}"})
+            return
 
         if parsed.path == "/api/mix":
             try:

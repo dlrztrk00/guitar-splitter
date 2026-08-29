@@ -29,12 +29,10 @@ TRACK_LABELS = {
 # Seconds of audio per chunk. htdemucs was trained on ~7.8s segments and throws
 # a shape error on anything longer, so this is a ceiling, not a preference.
 SEGMENT = 7.0
-# Chunk overlap. Demucs defaults to 0.25; 0.10 is measurably faster and the
-# difference lands ~30 dB below the mix.
-OVERLAP = 0.10
-
-PREVIEW_BITRATE = "160k"
-
+# Chunk overlap. Demucs' own default, and the more accurate setting: 0.10 is
+# about 20% faster but moves the guitar track by roughly 30 dB below the mix.
+# Accuracy wins here — the whole point is what the guitar track sounds like.
+OVERLAP = 0.25
 
 class AudioError(RuntimeError):
     pass
@@ -115,17 +113,6 @@ def _encode(path: Path, audio: np.ndarray, samplerate: int, args: list[str]) -> 
 def save_lossless(path: Path, audio: np.ndarray, samplerate: int) -> Path:
     """24-bit FLAC — what downloads are."""
     return _encode(path.with_suffix(".flac"), audio, samplerate, ["-c:a", "flac", "-sample_fmt", "s32"])
-
-
-def save_preview(path: Path, audio: np.ndarray, samplerate: int) -> Path:
-    """Compressed MP3 for the in-browser player only.
-
-    Six lossless stems is hundreds of megabytes for a browser to pull over a
-    free Space's bandwidth. Previews keep the page usable; downloads stay
-    lossless.
-    """
-    return _encode(path.with_suffix(".mp3"), audio, samplerate,
-                   ["-c:a", "libmp3lame", "-b:a", PREVIEW_BITRATE])
 
 
 def peaks(audio: np.ndarray, buckets: int = 900) -> list[float]:

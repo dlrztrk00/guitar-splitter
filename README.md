@@ -18,9 +18,10 @@ mute, solo, and a fader.
 - **Download this mix** saves exactly what you're hearing — guitar muted, or
   whatever balance you dialled in.
 
-Every download is lossless 24-bit FLAC. Playback in the page uses compressed
-previews so it stays responsive; that only affects what you hear in the browser,
-never what you save.
+**Everything is lossless 24-bit FLAC — including what you hear in the page.**
+There are no compressed previews: the player streams the same files you
+download. Compressed previews only make sense when bandwidth costs something,
+and this reads off your own disk.
 
 ## Setup (once)
 

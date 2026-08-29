@@ -169,8 +169,8 @@ __PLAYER__
     <button id="dlmix" class="ghost">Download this mix</button>
     <span class="muted">One file of exactly what you are hearing now.</span>
   </div>
-  <p class="hint">Or use <b>save</b> on any single lane above. Everything downloads as
-  lossless 24-bit FLAC.</p>
+  <p class="hint">Or use <b>save</b> on any single lane above. Everything here is
+  lossless 24-bit FLAC — including what you are hearing.</p>
   <div class="muted" id="dlnote" style="margin-top:10px"></div>
 </div>
 

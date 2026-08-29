@@ -92,9 +92,11 @@ class Jobs:
                          "peaks": A.peaks(stem) if used else [], "preview": "", "download": ""}
                 if used:
                     job.stage = f"Building {label}"
-                    A.save_preview(out / "tracks" / f"{key}-preview", stem, info.samplerate)
                     A.save_lossless(out / "tracks" / key, stem, info.samplerate)
-                    entry["preview"] = f"/media/{job.id}/tracks/{key}-preview.mp3"
+                    # Same file for playing and for saving: 24-bit lossless.
+                    # Serving compressed previews only makes sense when
+                    # bandwidth costs something, and here it is a local disk.
+                    entry["preview"] = f"/media/{job.id}/tracks/{key}.flac"
                     entry["download"] = (
                         f"/media/{job.id}/tracks/{key}.flac"
                         f"?name={urllib.parse.quote(f'{song} - {label}.flac')}"
@@ -219,14 +221,41 @@ class Handler(BaseHTTPRequestHandler):
             self._json(404, {"error": "not found"})
             return
 
-        extra = {"Accept-Ranges": "none"}
+        size = target.stat().st_size
+        start, end, status = 0, size - 1, 200
+
+        # Byte ranges are what make an <audio> element seekable. Without them a
+        # browser can only play from the beginning, which is exactly how this
+        # looked: click anywhere in the song, nothing moves.
+        header = self.headers.get("Range", "")
+        if header.startswith("bytes="):
+            spec = header[6:].split(",")[0].strip()
+            first, _, last = spec.partition("-")
+            try:
+                if first:
+                    start = int(first)
+                    end = int(last) if last else size - 1
+                elif last:
+                    start = size - int(last)   # suffix range: the final N bytes
+            except ValueError:
+                start, end = 0, size - 1
+            start = max(0, min(start, size - 1))
+            end = max(start, min(end, size - 1))
+            status = 206
+
+        with target.open("rb") as fh:
+            fh.seek(start)
+            body = fh.read(end - start + 1)
+
+        extra = {"Accept-Ranges": "bytes"}
+        if status == 206:
+            extra["Content-Range"] = f"bytes {start}-{end}/{size}"
         # ?name= turns a link into a download with a proper filename.
         wanted = urllib.parse.parse_qs(parsed.query).get("name", [None])[0]
         if wanted:
-            safe = wanted.replace('"', "")
-            extra["Content-Disposition"] = f'attachment; filename="{safe}"'
+            extra["Content-Disposition"] = f'attachment; filename="{wanted.replace(chr(34), "")}"'
         ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
-        self._send(200, target.read_bytes(), ctype, extra)
+        self._send(status, body, ctype, extra)
 
     def do_PUT(self) -> None:  # noqa: N802 — file upload
         if urllib.parse.urlparse(self.path).path != "/api/jobs":

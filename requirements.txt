@@ -1,0 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PINNED FOR INTEL MACS. Do not "upgrade" these.
+#
+# PyTorch's last macOS x86_64 build is 2.2.2, which needs Python <= 3.12.
+# A plain `pip install demucs` on this machine fails because of it.
+#
+# Nothing else is here on purpose. No web framework (the server is Python's
+# own), no librosa (it drags in 230 MB of LLVM for features this doesn't use).
+# torch's 581 MB is the floor — that is the separation model itself.
+# ─────────────────────────────────────────────────────────────────────────────
+torch==2.2.2
+torchaudio==2.2.2
+numpy==1.26.4
+demucs==4.0.1

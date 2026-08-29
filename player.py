@@ -38,11 +38,11 @@ PLAYER_SCRIPT = r"""
     const n = peaks.length, mid = h / 2, step = w / n;
     for (let i = 0; i < n; i++) {
       const played = (i / n) <= progress;
-      g.fillStyle = dim ? '#3a3330' : (played ? '#e0813f' : '#4e4642');
+      g.fillStyle = dim ? '#3b2320' : (played ? '#e8352b' : '#5c2f2a');
       const amp = Math.max(1, peaks[i] * (h * 0.46));
       g.fillRect(i * step, mid - amp, Math.max(1, step - 0.5), amp * 2);
     }
-    g.fillStyle = '#fff';
+    g.fillStyle = '#efe7d8';
     g.fillRect(clamp(progress * w, 0, w - 1.5), 0, 1.5, h);
   }
 
@@ -179,6 +179,7 @@ PLAYER_SCRIPT = r"""
       keys.forEach(k => { try { state[k].audio.currentTime = at; } catch (err) {} });
       Promise.all(keys.map(k => state[k].audio.play())).catch(() => {});
       playing = true;
+      document.body.classList.add('gs-playing');
       root.querySelector('.gs-play').textContent = '❚❚';
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(tick);
@@ -200,6 +201,7 @@ PLAYER_SCRIPT = r"""
       if (!playing) return;
       keys.forEach(k => state[k].audio.pause());
       playing = false;
+      document.body.classList.remove('gs-playing');
       root.querySelector('.gs-play').textContent = '▶';
       cancelAnimationFrame(raf); clearInterval(timer);
       draw();
@@ -251,32 +253,41 @@ PLAYER_SCRIPT = r"""
 })();
 </script>
 <style>
-  #gs-player { font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", sans-serif; color: #efe9e4; }
-  #gs-player .gs-transport { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
-  #gs-player .gs-play { width: 46px; height: 46px; border-radius: 50%; border: 0; cursor: pointer;
-    background: #e0813f; color: #1a0f07; font-size: 16px; flex: none; }
-  #gs-player .gs-bar { flex: 1; height: 18px; display: flex; align-items: center; cursor: pointer;
+  #gs-player { font: 14px/1.5 var(--body); color: var(--cream); }
+  #gs-player .gs-transport { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  #gs-player .gs-play { width: 50px; height: 50px; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--red); color: var(--cream); font-size: 16px; flex: none;
+    box-shadow: 0 0 0 4px rgba(232,53,43,.14), inset 0 2px 6px rgba(255,255,255,.28);
+    transition: transform .1s; }
+  #gs-player .gs-play:active { transform: scale(.94); }
+  #gs-player .gs-bar { flex: 1; height: 20px; display: flex; align-items: center; cursor: pointer;
     touch-action: none; }
-  #gs-player .gs-bartrack { width: 100%; height: 6px; border-radius: 3px; background: #342e2b;
-    pointer-events: none; }
-  #gs-player .gs-played { height: 100%; border-radius: 3px; background: #e0813f; width: 0; }
-  #gs-player .gs-time { font-variant-numeric: tabular-nums; color: #a2968d; min-width: 96px; text-align: right; }
-  #gs-player .gs-lane { display: flex; align-items: center; gap: 12px; padding: 9px 0;
-    border-top: 1px solid #2f2a28; }
-  #gs-player .gs-name { width: 74px; flex: none; font-weight: 600; }
+  #gs-player .gs-bartrack { width: 100%; height: 7px; border-radius: 4px; background: #2a1512;
+    pointer-events: none; box-shadow: inset 0 1px 3px rgba(0,0,0,.7); }
+  #gs-player .gs-played { height: 100%; border-radius: 4px; background: var(--red-lit); width: 0; }
+  #gs-player .gs-time { font: 13px/1 var(--mono); letter-spacing: .04em;
+    color: var(--dim); min-width: 104px; text-align: right; }
+
+  #gs-player .gs-lane { display: flex; align-items: center; gap: 12px; padding: 10px 0;
+    border-top: 1px solid rgba(239,231,216,.09); }
+  #gs-player .gs-name { width: 86px; flex: none; font: 600 15px/1 var(--display);
+    letter-spacing: .09em; text-transform: uppercase; }
   #gs-player .gs-btns { display: flex; gap: 5px; flex: none; }
-  #gs-player .gs-btns button { width: 27px; height: 27px; border-radius: 7px; cursor: pointer;
-    border: 1px solid #3f3936; background: transparent; color: #a2968d; font-size: 12px; font-weight: 700; }
-  #gs-player .gs-mute.on { background: #c2503f; border-color: #c2503f; color: #fff; }
-  #gs-player .gs-solo.on { background: #e0813f; border-color: #e0813f; color: #1a0f07; }
-  #gs-player canvas { flex: 1; height: 46px; min-width: 90px; cursor: pointer; touch-action: none; }
-  #gs-player .gs-fader { width: 96px; flex: none; accent-color: #e0813f; }
-  #gs-player .gs-vol { width: 42px; flex: none; text-align: right; color: #a2968d;
-    font-variant-numeric: tabular-nums; font-size: 12px; }
-  #gs-player .gs-unused { color: #6b615c; font-style: italic; flex: 1; }
-  #gs-player a.gs-dl { color: #a2968d; text-decoration: none; font-size: 12px; flex: none;
-    border: 1px solid #3f3936; border-radius: 7px; padding: 5px 9px; }
-  #gs-player a.gs-dl:hover { color: #e0813f; border-color: #e0813f; }
+  #gs-player .gs-btns button { width: 28px; height: 28px; border-radius: 4px; cursor: pointer;
+    border: 1px solid rgba(239,231,216,.22); background: transparent; color: var(--dim);
+    font: 700 11px/1 var(--display); letter-spacing: .06em; }
+  #gs-player .gs-btns button:hover { border-color: var(--cream); color: var(--cream); }
+  #gs-player .gs-mute.on { background: var(--red); border-color: var(--red); color: #fff; }
+  #gs-player .gs-solo.on { background: var(--green); border-color: var(--green); color: #10240a; }
+  #gs-player canvas { flex: 1; height: 48px; min-width: 90px; cursor: pointer; touch-action: none; }
+  #gs-player .gs-fader { width: 92px; flex: none; accent-color: var(--red-lit); }
+  #gs-player .gs-vol { width: 44px; flex: none; text-align: right; color: var(--dim);
+    font: 12px/1 var(--mono); }
+  #gs-player .gs-unused { color: #6a4b46; font-style: italic; flex: 1; }
+  #gs-player a.gs-dl { color: var(--dim); text-decoration: none; flex: none;
+    font: 700 10px/1 var(--display); letter-spacing: .1em; text-transform: uppercase;
+    border: 1px solid rgba(239,231,216,.22); border-radius: 4px; padding: 7px 10px; }
+  #gs-player a.gs-dl:hover { color: var(--cream); border-color: var(--cream); }
 </style>
 """
 

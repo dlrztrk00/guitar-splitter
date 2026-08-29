@@ -52,31 +52,71 @@ exec "\$REPO/venv/bin/python" app.py --port "\$PORT"
 LAUNCHER
 chmod +x "$APP/Contents/MacOS/GuitarSplit"
 
-# Icon, drawn with tools already on the machine.
+# Icon: the same red cassette the app itself is built around, drawn with tools
+# already on the machine. Kept blunt on purpose - at 16px only the red body,
+# the cream label and two reels survive, so those carry the whole shape.
 python3 - "$APP" <<'PYICON'
 import subprocess, sys, tempfile, pathlib
+
 app = pathlib.Path(sys.argv[1])
-svg = '''<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
-<rect width="1024" height="1024" rx="230" fill="#1b1817"/>
-<g stroke="#e0813f" stroke-width="30" stroke-linecap="round" fill="none">
-<path d="M250 300 L774 300"/><path d="M250 430 L774 430"/>
-<path d="M250 560 L774 560" stroke="#4a423e"/><path d="M250 690 L774 690" stroke="#4a423e"/>
-</g><circle cx="390" cy="365" r="70" fill="#e0813f"/></svg>'''
+svg = """<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#1c1715"/><stop offset="1" stop-color="#050404"/></linearGradient>
+  <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#e02b21"/><stop offset="55%" stop-color="#a01c15"/>
+    <stop offset="1" stop-color="#680f0b"/></linearGradient>
+  <linearGradient id="label" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fdfaf3"/><stop offset="1" stop-color="#ddd3c0"/></linearGradient>
+</defs>
+<rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
+<rect x="128" y="258" width="768" height="508" rx="38" fill="url(#body)"/>
+<path d="M128 296 q384 -86 768 0 v44 q-384 -74 -768 0z" fill="#ffffff" opacity=".14"/>
+<rect x="182" y="312" width="660" height="142" rx="9" fill="url(#label)"/>
+<rect x="220" y="356" width="474" height="30" rx="15" fill="#1a1512" opacity=".85"/>
+<rect x="220" y="404" width="286" height="20" rx="10" fill="#c9241c" opacity=".8"/>
+<circle cx="336" cy="596" r="106" fill="#63100c"/>
+<circle cx="336" cy="596" r="62" fill="#141110"/>
+<circle cx="336" cy="596" r="62" fill="none" stroke="#efe7d8" stroke-width="17"/>
+<circle cx="688" cy="596" r="106" fill="#63100c"/>
+<circle cx="688" cy="596" r="62" fill="#141110"/>
+<circle cx="688" cy="596" r="62" fill="none" stroke="#efe7d8" stroke-width="17"/>
+<rect x="452" y="562" width="120" height="68" rx="12" fill="#2b0705"/>
+<rect x="182" y="700" width="660" height="44" rx="7" fill="url(#label)" opacity=".93"/>
+<g transform="rotate(-9 806 726)"><rect x="726" y="686" width="164" height="80" rx="7" fill="#6fd44f"/></g>
+</svg>"""
+
+# iconutil wants an exact set of names; render each pixel size once and file it
+# under every name that needs it.
+NAMES = {
+    16: ["icon_16x16.png"],
+    32: ["icon_32x32.png", "icon_16x16@2x.png"],
+    64: ["icon_32x32@2x.png"],
+    128: ["icon_128x128.png"],
+    256: ["icon_256x256.png", "icon_128x128@2x.png"],
+    512: ["icon_512x512.png", "icon_256x256@2x.png"],
+    1024: ["icon_512x512@2x.png"],
+}
+
 with tempfile.TemporaryDirectory() as d:
     d = pathlib.Path(d)
     (d / "i.svg").write_text(svg)
-    iconset = d / "GuitarSplit.iconset"; iconset.mkdir()
-    for size in (32, 64, 128, 256, 512, 1024):
+    iconset = d / "GuitarSplit.iconset"
+    iconset.mkdir()
+    for size, names in NAMES.items():
         subprocess.run(["qlmanage", "-t", "-s", str(size), "-o", str(d), str(d / "i.svg")],
                        capture_output=True)
         src = d / "i.svg.png"
         if not src.exists():
+            print("icon render failed at", size)
             break
-        for name in (f"icon_{size}x{size}.png", f"icon_{size//2}x{size//2}@2x.png"):
+        for name in names:
             subprocess.run(["cp", str(src), str(iconset / name)], capture_output=True)
         src.unlink()
-    subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o",
-                    str(app / "Contents/Resources/GuitarSplit.icns")], capture_output=True)
+    r = subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o",
+                        str(app / "Contents/Resources/GuitarSplit.icns")], capture_output=True)
+    if r.returncode:
+        print("iconutil:", r.stderr.decode()[:200])
 PYICON
 
 touch "$APP"

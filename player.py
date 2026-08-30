@@ -314,7 +314,8 @@ def build_html(session: str, tracks: list[dict], duration: float) -> str:
             f'<canvas></canvas>'
             f'<input class="gs-fader" type="range" min="0" max="100" value="100">'
             f'<span class="gs-vol">100%</span>'
-            f'<a class="gs-dl" href="{t["download"]}" download>save</a>'
+            f'<a class="gs-dl" href="{t["stem"]}.flac" data-stem="{t["stem"]}" '
+            f'data-filename="{html.escape(t["filename"], quote=True)}" download>save</a>'
             f"</div>"
         )
 

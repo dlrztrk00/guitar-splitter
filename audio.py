@@ -144,6 +144,29 @@ def save_lossless(path: Path, audio: np.ndarray, samplerate: int) -> Path:
     return _encode(path.with_suffix(".flac"), audio, samplerate, ["-c:a", "flac", "-sample_fmt", "s32"])
 
 
+# 320 kbps: the top of what MP3 offers, so the smaller file costs as little as
+# it can. Roughly a third the size of the FLAC.
+MP3_BITRATE = "320k"
+
+
+def transcode(src: Path, dest: Path, bitrate: str = MP3_BITRATE) -> Path:
+    """FLAC to MP3, straight through ffmpeg rather than back through numpy."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run(
+        [tool("ffmpeg"), "-y", "-v", "error", "-i", str(src),
+         "-c:a", "libmp3lame", "-b:a", bitrate, str(dest)],
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        raise AudioError(f"Could not convert {src.name}:\n{proc.stderr.decode(errors='replace')[:400]}")
+    return dest
+
+
+def save_mp3(path: Path, audio: np.ndarray, samplerate: int, bitrate: str = MP3_BITRATE) -> Path:
+    return _encode(path.with_suffix(".mp3"), audio, samplerate,
+                   ["-c:a", "libmp3lame", "-b:a", bitrate])
+
+
 def peaks(audio: np.ndarray, buckets: int = 900) -> list[float]:
     """Per-bucket peak amplitude, for drawing the waveform."""
     mono = np.abs(audio.mean(axis=0) if audio.ndim > 1 else audio)

@@ -18,10 +18,13 @@ mute, solo, and a fader.
 - **Download this mix** saves exactly what you're hearing — guitar muted, or
   whatever balance you dialled in.
 
-**Everything is lossless 24-bit FLAC — including what you hear in the page.**
-There are no compressed previews: the player streams the same files you
-download. Compressed previews only make sense when bandwidth costs something,
-and this reads off your own disk.
+**Playback is always lossless** — the player streams the same 24-bit FLAC files
+it separated, straight off your disk. There are no compressed previews.
+
+Downloads are your choice: **FLAC** (lossless) or **MP3** at 320 kbps, which is
+roughly a fifth the size. The MP3 is made the first time you ask for one and
+then kept, so nothing is encoded that you never wanted. On a 3-minute song a
+full set of stems is about 158 MB as FLAC and 36 MB as MP3.
 
 ## Setup (once)
 

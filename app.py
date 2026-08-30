@@ -89,7 +89,8 @@ class Jobs:
                 stem, label = stems[key], A.TRACK_LABELS[key]
                 used = A.is_used(stem)
                 entry = {"key": key, "label": label, "used": used,
-                         "peaks": A.peaks(stem) if used else [], "preview": "", "download": ""}
+                         "peaks": A.peaks(stem) if used else [],
+                         "preview": "", "stem": "", "filename": ""}
                 if used:
                     job.stage = f"Building {label}"
                     A.save_lossless(out / "tracks" / key, stem, info.samplerate)
@@ -97,10 +98,8 @@ class Jobs:
                     # Serving compressed previews only makes sense when
                     # bandwidth costs something, and here it is a local disk.
                     entry["preview"] = f"/media/{job.id}/tracks/{key}.flac"
-                    entry["download"] = (
-                        f"/media/{job.id}/tracks/{key}.flac"
-                        f"?name={urllib.parse.quote(f'{song} - {label}.flac')}"
-                    )
+                    entry["stem"] = f"/media/{job.id}/tracks/{key}"
+                    entry["filename"] = f"{song} - {label}"
                 tracks.append(entry)
 
             # Keep the stems so a custom mix can be rendered without separating
@@ -131,7 +130,7 @@ class Jobs:
             traceback.print_exc()
 
 
-def render_mix(session: str, gains: dict[str, float]) -> tuple[Path, str]:
+def render_mix(session: str, gains: dict[str, float], fmt: str = "flac") -> tuple[Path, str]:
     """Render the current fader positions to a lossless file."""
     import numpy as np
 
@@ -156,11 +155,12 @@ def render_mix(session: str, gains: dict[str, float]) -> tuple[Path, str]:
         label = "original"
     else:
         label = "custom mix"
-    path = A.save_lossless(out / f"mix-{abs(hash(label)) % 10**6}", mix, samplerate)
-    return path, f"{label}.flac"
+    base = out / f"mix-{abs(hash((label, fmt))) % 10**6}"
+    path = A.save_mp3(base, mix, samplerate) if fmt == "mp3" else A.save_lossless(base, mix, samplerate)
+    return path, f"{label}.{fmt}"
 
 
-def zip_tracks(session: str, song: str) -> Path:
+def zip_tracks(session: str, song: str, fmt: str = "flac") -> Path:
     """Every instrument as its own file, in one folder.
 
     Stored rather than deflated: FLAC is already compressed, so squeezing it
@@ -172,11 +172,18 @@ def zip_tracks(session: str, song: str) -> Path:
     if not tracks:
         raise FileNotFoundError("That song is no longer loaded. Split it again.")
 
-    path = out / "stems.zip"
+    path = out / f"stems-{fmt}.zip"
+    # Stored rather than deflated either way: both formats are already
+    # compressed, so squeezing them again just burns CPU for nothing.
     with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as z:
         for f in tracks:
             label = A.TRACK_LABELS.get(f.stem, f.stem.title())
-            z.write(f, arcname=f"{song}/{label}.flac")
+            member = f
+            if fmt == "mp3":
+                member = f.with_suffix(".mp3")
+                if not member.is_file():
+                    A.transcode(f, member)
+            z.write(member, arcname=f"{song}/{label}.{fmt}")
     return path
 
 
@@ -217,7 +224,21 @@ class Handler(BaseHTTPRequestHandler):
         parts = [urllib.parse.unquote(p) for p in parsed.path.split("/")[2:] if p]
         target = WORK.joinpath(*parts).resolve()
         # Never serve outside the working directory, whatever the URL claims.
-        if WORK.resolve() not in target.parents or not target.is_file():
+        if WORK.resolve() not in target.parents:
+            self._json(404, {"error": "not found"})
+            return
+
+        # An .mp3 that does not exist yet is made from the .flac beside it, once,
+        # and cached. Nothing is encoded unless someone actually asks for it.
+        if not target.is_file() and target.suffix == ".mp3":
+            source = target.with_suffix(".flac")
+            if source.is_file():
+                try:
+                    A.transcode(source, target)
+                except A.AudioError:
+                    self._json(500, {"error": "could not convert to mp3"})
+                    return
+        if not target.is_file():
             self._json(404, {"error": "not found"})
             return
 
@@ -286,8 +307,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if parsed.path == "/api/zip":
             song = A.safe_name(body.get("song") or "GuitarSplit")
+            fmt = "mp3" if body.get("fmt") == "mp3" else "flac"
             try:
-                path = zip_tracks(body.get("session", ""), song)
+                path = zip_tracks(body.get("session", ""), song, fmt)
             except FileNotFoundError as exc:
                 self._json(404, {"error": str(exc)})
                 return
@@ -295,12 +317,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(500, {"error": f"{type(exc).__name__}: {exc}"})
                 return
             rel = path.relative_to(WORK).as_posix()
-            self._json(200, {"url": f"/media/{rel}?name={urllib.parse.quote(song + ' - stems.zip')}"})
+            label = f"{song} - stems ({fmt}).zip"
+            self._json(200, {"url": f"/media/{rel}?name={urllib.parse.quote(label)}"})
             return
 
         if parsed.path == "/api/mix":
             try:
-                path, name = render_mix(body.get("session", ""), body.get("gains") or {})
+                path, name = render_mix(body.get("session", ""), body.get("gains") or {},
+                                        "mp3" if body.get("fmt") == "mp3" else "flac")
             except FileNotFoundError as exc:
                 self._json(404, {"error": str(exc)})
                 return

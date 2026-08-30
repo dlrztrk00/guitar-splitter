@@ -109,6 +109,11 @@ PAGE = """<!doctype html>
  .hint{font:12px/1.7 var(--body);color:#6a5b54;margin-top:8px}
  kbd{background:#241a18;border:1px solid rgba(239,231,216,.18);border-radius:3px;
    padding:1px 6px;font:11px/1 var(--mono);color:var(--cream)}
+ .seg{display:inline-flex;border:1px solid rgba(239,231,216,.22);border-radius:5px;overflow:hidden}
+ .seg button{background:transparent;color:var(--dim);border:0;border-radius:0;padding:8px 16px;
+   font:700 12px/1 var(--display);letter-spacing:.1em}
+ .seg button+button{border-left:1px solid rgba(239,231,216,.22)}
+ .seg button.on{background:var(--cream);color:#171310}
 </style>
 __PLAYER__
 </head><body><div class="wrap">
@@ -161,6 +166,13 @@ __PLAYER__
 
 <div class="card" id="save" hidden>
   <h2>Take it with you</h2>
+  <div class="row" style="margin-bottom:18px">
+    <span class="muted">Format</span>
+    <div class="seg">
+      <button class="on" data-fmt="flac">FLAC</button><button data-fmt="mp3">MP3</button>
+    </div>
+    <span class="muted" id="fmtnote">Lossless, exactly what came out of the separation.</span>
+  </div>
   <div class="row">
     <button id="dlall" class="tag">Download all instruments</button>
     <span class="muted">A folder with every instrument as its own file.</span>
@@ -169,8 +181,8 @@ __PLAYER__
     <button id="dlmix" class="ghost">Download this mix</button>
     <span class="muted">One file of exactly what you are hearing now.</span>
   </div>
-  <p class="hint">Or use <b>save</b> on any single lane above. Everything here is
-  lossless 24-bit FLAC — including what you are hearing.</p>
+  <p class="hint">Or use <b>save</b> on any single lane above — it follows the format
+  you pick here. Playback in the page is always lossless, whatever you download.</p>
   <div class="muted" id="dlnote" style="margin-top:10px"></div>
 </div>
 
@@ -249,7 +261,28 @@ function show(r){
     + '<kbd>space</kbd> play · <kbd>←</kbd> <kbd>→</kbd> skip 5s · <kbd>home</kbd> start</p></div>';
   $('#save').hidden = false;
   $('#dlnote').textContent = '';
+  applyFormat();
 }
+
+let fmt = 'flac';
+const FMT_NOTE = {
+  flac: 'Lossless, exactly what came out of the separation.',
+  mp3:  '320 kbps — about a third the size, plays anywhere.',
+};
+
+// Retarget the per-lane save links; playback always stays on the lossless file.
+function applyFormat(){
+  document.querySelectorAll('.seg button').forEach(b =>
+    b.classList.toggle('on', b.dataset.fmt === fmt));
+  $('#fmtnote').textContent = FMT_NOTE[fmt];
+  document.querySelectorAll('#gs-player a.gs-dl').forEach(a => {
+    const name = a.dataset.filename + '.' + fmt;
+    a.href = a.dataset.stem + '.' + fmt + '?name=' + encodeURIComponent(name);
+  });
+}
+document.querySelectorAll('.seg button').forEach(b => {
+  b.onclick = () => { fmt = b.dataset.fmt; applyFormat(); $('#dlnote').textContent=''; };
+});
 
 function saveAs(url){
   const a = document.createElement('a'); a.href = url; a.download='';
@@ -260,11 +293,12 @@ $('#dlall').onclick = async () => {
   if (!result) return;
   $('#dlall').disabled = true; $('#dlnote').textContent = 'Packing…';
   const res = await fetch('/api/zip', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({session: result.session, song: result.song})});
+    body: JSON.stringify({session: result.session, song: result.song, fmt})});
   const out = await res.json();
   $('#dlall').disabled = false;
   if (out.error){ $('#dlnote').innerHTML = '<span class="err">'+out.error+'</span>'; return; }
-  $('#dlnote').textContent = 'Saved. Unzip it for a folder of '+result.played.length+' instruments.';
+  $('#dlnote').textContent = 'Saved. Unzip it for a folder of '+result.played.length
+    +' instruments as '+fmt.toUpperCase()+'.';
   saveAs(out.url);
 };
 
@@ -274,7 +308,7 @@ $('#dlmix').onclick = async () => {
   if (!state){ $('#dlnote').textContent='Play something first.'; return; }
   $('#dlmix').disabled = true; $('#dlnote').textContent = 'Rendering…';
   const res = await fetch('/api/mix', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({session: result.session, song: result.song, gains: state.gains})});
+    body: JSON.stringify({session: result.session, song: result.song, gains: state.gains, fmt})});
   const out = await res.json();
   $('#dlmix').disabled = false;
   if (out.error){ $('#dlnote').innerHTML = '<span class="err">'+out.error+'</span>'; return; }

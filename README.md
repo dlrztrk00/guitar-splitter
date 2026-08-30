@@ -8,8 +8,9 @@ Everything happens on your own computer. Nothing is uploaded anywhere.
 
 ## What you see
 
-Drop a song in and you get a mixer: one lane per instrument, with a waveform,
-mute, solo, and a fader.
+Drop a song in — **or paste a YouTube link and it fetches the audio itself** —
+and you get a mixer: one lane per instrument, with a waveform, mute, solo, and a
+fader.
 
 - **Guitar · Vocals · Drums · Bass · Piano · Other**
 - Instruments that aren't played are labelled *not played in this song*, instead
@@ -25,6 +26,18 @@ Downloads are your choice: **FLAC** (lossless) or **MP3** at 320 kbps, which is
 roughly a fifth the size. The MP3 is made the first time you ask for one and
 then kept, so nothing is encoded that you never wanted. On a 3-minute song a
 full set of stems is about 158 MB as FLAC and 36 MB as MP3.
+
+## Links
+
+Paste a YouTube URL and it downloads the audio with yt-dlp, then separates it.
+Nothing is uploaded: the download happens on your machine and so does the
+separation.
+
+Two things worth knowing. YouTube changes its player regularly and yt-dlp needs
+updating when it does — if a link starts failing, the app says so and the fix is
+`./venv/bin/pip install -U yt-dlp`. And downloading from YouTube is against
+their terms of service; for practising along at home it's the same grey area as
+every tool of this kind, but that's the situation rather than a green light.
 
 ## Setup (once)
 

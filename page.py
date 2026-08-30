@@ -109,6 +109,14 @@ PAGE = """<!doctype html>
  .hint{font:12px/1.7 var(--body);color:#6a5b54;margin-top:8px}
  kbd{background:#241a18;border:1px solid rgba(239,231,216,.18);border-radius:3px;
    padding:1px 6px;font:11px/1 var(--mono);color:var(--cream)}
+ input[type=text]{flex:1;min-width:220px;background:#0f0c0b;color:var(--cream);
+   border:1px solid rgba(239,231,216,.20);border-radius:5px;padding:12px 14px;
+   font:14px/1 var(--body)}
+ input[type=text]:focus{outline:none;border-color:var(--red-lit)}
+ input[type=text]::placeholder{color:#5c534a}
+ .or{display:flex;align-items:center;gap:14px;margin:18px 0;color:#5c534a;
+   font:700 11px/1 var(--display);letter-spacing:.16em;text-transform:uppercase}
+ .or::before,.or::after{content:"";flex:1;height:1px;background:rgba(239,231,216,.10)}
  .seg{display:inline-flex;border:1px solid rgba(239,231,216,.22);border-radius:5px;overflow:hidden}
  .seg button{background:transparent;color:var(--dim);border:0;border-radius:0;padding:8px 16px;
    font:700 12px/1 var(--display);letter-spacing:.1em}
@@ -150,7 +158,14 @@ __PLAYER__
     or click to choose one · mp3, wav, m4a, flac
   </div>
   <input type="file" id="file" accept="audio/*,.mp3,.wav,.m4a,.flac,.aif,.aiff" hidden>
-  <p class="hint">Everything happens on this computer. Nothing is uploaded anywhere.</p>
+  <div class="or"><span>or paste a link</span></div>
+  <div class="row" style="gap:10px">
+    <input type="text" id="url" placeholder="https://www.youtube.com/watch?v=&hellip;"
+           autocomplete="off" spellcheck="false">
+    <button id="go">Fetch</button>
+  </div>
+  <p class="hint">Everything happens on this computer. Nothing is uploaded anywhere &mdash;
+  a link is downloaded here and separated here.</p>
 </div>
 
 <div class="card" id="progress" hidden>
@@ -196,18 +211,35 @@ $('#drop').ondragleave = () => $('#drop').classList.remove('over');
 $('#drop').ondrop = e => { e.preventDefault(); $('#drop').classList.remove('over');
   if (e.dataTransfer.files[0]) start(e.dataTransfer.files[0]); };
 $('#file').onchange = e => { if (e.target.files[0]) start(e.target.files[0]); };
+$('#go').onclick = () => startUrl($('#url').value.trim());
+$('#url').onkeydown = e => { if (e.key === 'Enter') startUrl($('#url').value.trim()); };
 
 function scrawl(text){ $('#scrawl').textContent = text; }
 
-async function start(file){
+function begin(label){
   $('#found').innerHTML=''; $('#mixer').innerHTML=''; $('#save').hidden=true;
   document.body.classList.remove('gs-playing');
-  const name = file.name.replace(/\\.[^.]+$/,'');
-  scrawl(name);
+  scrawl(label);
   $('#sticker').textContent = 'LOADING';
-  $('#footinfo').textContent = 'reading…';
-  $('#progress').hidden=false; $('#ptitle').textContent=name;
-  $('#pstage').textContent='Uploading'; $('#pbar').style.width='2%';
+  $('#progress').hidden=false; $('#ptitle').textContent=label;
+  $('#pbar').style.width='2%';
+}
+
+async function startUrl(url){
+  if (!url){ $('#url').focus(); return; }
+  begin('from a link');
+  $('#pstage').textContent='Finding the audio'; $('#footinfo').textContent='fetching…';
+  const res = await fetch('/api/jobs', {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({url})});
+  const job = await res.json();
+  if (job.error){ fail(job.error); return; }
+  jobId = job.id;
+  poll = setInterval(tick, 1000); tick();
+}
+
+async function start(file){
+  begin(file.name.replace(/\\.[^.]+$/,''));
+  $('#pstage').textContent='Uploading'; $('#footinfo').textContent='reading…';
   const res = await fetch('/api/jobs', {method:'PUT',
     headers:{'X-Filename':encodeURIComponent(file.name)}, body:file});
   const job = await res.json();
@@ -229,14 +261,19 @@ async function tick(){
   $('#footinfo').textContent = job.stage.toLowerCase();
   // Separation runs at a steady fraction of realtime, so once the song length
   // is known the elapsed time gives an honest estimate.
+  const dl = job.stage.match(/^Downloading ([\\d.]+)%/);
   const est = Math.max(20, (job.duration||120) * 0.85 + 25);
   if (job.state==='running'){
-    $('#pbar').style.width = (Math.min(0.97, job.elapsed/est)*100).toFixed(0)+'%';
+    $('#pbar').style.width = dl ? Math.min(20, parseFloat(dl[1])/5)+'%'
+                                : (Math.min(0.97, job.elapsed/est)*100).toFixed(0)+'%';
     const left = Math.max(0, Math.round(est - job.elapsed));
     $('#ptime').textContent = Math.round(job.elapsed)+'s elapsed'
       + (job.duration ? ' · about '+left+'s left' : '');
   }
   if (job.state==='error'){ fail(job.error); return; }
+  if (job.title && job.title !== $('#ptitle').textContent && job.state==='running'){
+    $('#ptitle').textContent = job.title; scrawl(job.title);
+  }
   if (job.state==='done'){
     clearInterval(poll);
     $('#pbar').style.width='100%';

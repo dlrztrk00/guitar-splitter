@@ -12,3 +12,4 @@ torch==2.2.2
 torchaudio==2.2.2
 numpy==1.26.4
 demucs==4.0.1
+yt-dlp>=2024.1.1

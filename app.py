@@ -25,6 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import audio as A
+import fetch
 from page import PAGE
 from player import build_html
 
@@ -60,15 +61,23 @@ class Jobs:
         with self._lock:
             return self._jobs.get(job_id)
 
-    def start(self, source: Path, title: str) -> Job:
+    def start(self, source: Path | str, title: str) -> Job:
         job = Job(id=uuid.uuid4().hex[:12], title=title)
         with self._lock:
             self._jobs[job.id] = job
         threading.Thread(target=self._work, args=(job, source), daemon=True).start()
         return job
 
-    def _work(self, job: Job, source: Path) -> None:
+    def _work(self, job: Job, source: Path | str) -> None:
         try:
+            if isinstance(source, str) and fetch.is_url(source):
+                job.stage = "Finding the audio"
+                source = fetch.fetch(
+                    source, WORK / "downloads",
+                    on_progress=lambda pct: setattr(job, "stage", f"Downloading {pct:.0f}%"),
+                )
+                job.title = Path(source).stem.replace("_", " ").strip()
+
             job.stage = "Reading the file"
             original, info = A.load(source)
             job.duration = info.duration
@@ -123,6 +132,10 @@ class Jobs:
             }
             job.state = "done"
             job.stage = "Done"
+        except (fetch.FetchError, A.AudioError) as exc:
+            job.state = "error"
+            job.error = str(exc)
+            job.stage = "Failed"
         except Exception as exc:  # noqa: BLE001 — the page should see any failure
             job.state = "error"
             job.error = f"{type(exc).__name__}: {exc}"
@@ -304,6 +317,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         parsed = urllib.parse.urlparse(self.path)
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+
+        if parsed.path == "/api/jobs":
+            url = (body.get("url") or "").strip()
+            if not fetch.is_url(url):
+                self._json(400, {"error": "That does not look like a link."})
+                return
+            self._json(200, self.jobs.start(url, url).as_dict())
+            return
 
         if parsed.path == "/api/zip":
             song = A.safe_name(body.get("song") or "GuitarSplit")

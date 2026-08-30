@@ -38,6 +38,35 @@ class AudioError(RuntimeError):
     pass
 
 
+# An app launched from Finder does not inherit your shell's PATH — it gets a
+# bare one without /usr/local/bin, so Homebrew's ffmpeg is invisible and every
+# run dies on "No such file or directory: 'ffprobe'". Resolving the binaries
+# ourselves makes the app behave the same however it was started.
+_TOOL_DIRS = ("/usr/local/bin", "/opt/homebrew/bin", "/usr/bin", "/bin")
+_tools: dict[str, str] = {}
+
+
+def tool(name: str) -> str:
+    """Absolute path to ffmpeg or ffprobe, however this process was launched."""
+    if name in _tools:
+        return _tools[name]
+    import shutil
+
+    found = shutil.which(name)
+    if not found:
+        for directory in _TOOL_DIRS:
+            candidate = Path(directory) / name
+            if candidate.is_file():
+                found = str(candidate)
+                break
+    if not found:
+        raise AudioError(
+            f"{name} is not installed. Open Terminal and run:  brew install ffmpeg"
+        )
+    _tools[name] = found
+    return found
+
+
 def safe_name(text: str) -> str:
     """A song title that survives being a filename."""
     import re
@@ -60,7 +89,7 @@ class Info:
 
 def probe(path: str | Path) -> Info:
     out = subprocess.run(
-        ["ffprobe", "-v", "error", "-select_streams", "a:0",
+        [tool("ffprobe"), "-v", "error", "-select_streams", "a:0",
          "-show_entries", "stream=sample_rate,channels",
          "-show_entries", "format=duration", "-of", "json", str(path)],
         capture_output=True, text=True,
@@ -82,7 +111,7 @@ def load(path: str | Path) -> tuple[np.ndarray, Info]:
     """Decode to float32 (channels, samples) at the file's own sample rate."""
     info = probe(path)
     proc = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", str(path), "-f", "f32le",
+        [tool("ffmpeg"), "-v", "error", "-i", str(path), "-f", "f32le",
          "-acodec", "pcm_f32le", "-ac", str(info.channels),
          "-ar", str(info.samplerate), "-"],
         capture_output=True,
@@ -101,7 +130,7 @@ def _encode(path: Path, audio: np.ndarray, samplerate: int, args: list[str]) -> 
     if audio.ndim == 1:
         audio = audio[None, :]
     proc = subprocess.run(
-        ["ffmpeg", "-y", "-v", "error", "-f", "f32le", "-ar", str(samplerate),
+        [tool("ffmpeg"), "-y", "-v", "error", "-f", "f32le", "-ar", str(samplerate),
          "-ac", str(audio.shape[0]), "-i", "-", *args, str(path)],
         input=np.ascontiguousarray(audio.T).tobytes(), capture_output=True,
     )

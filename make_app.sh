@@ -48,6 +48,11 @@ if [ ! -x "\$REPO/venv/bin/python" ]; then
 fi
 
 cd "\$REPO" || exit 1
+
+# Finder hands an app a minimal PATH without Homebrew on it. The code resolves
+# ffmpeg by absolute path anyway, but a sane PATH costs nothing.
+export PATH="/usr/local/bin:/opt/homebrew/bin:\$PATH"
+
 exec "\$REPO/venv/bin/python" app.py --port "\$PORT"
 LAUNCHER
 chmod +x "$APP/Contents/MacOS/GuitarSplit"

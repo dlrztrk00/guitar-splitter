@@ -1,104 +1,130 @@
+<img src="docs/icon.png" width="88" align="right" alt="">
+
 # GuitarSplit
 
-Upload a song, get every instrument as its own track, **mute the guitar and play
-it yourself.** Like Logic's Stem Splitter — except it runs on an Intel Mac,
-which Logic's version does not.
+Split a song into its instruments, **mute the guitar, and play it yourself.**
 
-Everything happens on your own computer. Nothing is uploaded anywhere.
+A stem separator for guitarists, built for **Intel Macs** — where Logic Pro's own
+Stem Splitter does not run, because Apple ships it only for Apple Silicon.
 
-## What you see
+Everything happens on your own machine. No account, no upload, no service.
 
-Drop a song in — **or paste a YouTube link and it fetches the audio itself** —
-and you get a mixer: one lane per instrument, with a waveform, mute, solo, and a
-fader.
+---
 
-- **Guitar · Vocals · Drums · Bass · Piano · Other**
-- Instruments that aren't played are labelled *not played in this song*, instead
-  of handing you a silent file to wonder about.
-- **`save`** on any lane downloads that instrument on its own.
-- **Download this mix** saves exactly what you're hearing — guitar muted, or
-  whatever balance you dialled in.
+## What you get
 
-**Playback is always lossless** — the player streams the same 24-bit FLAC files
-it separated, straight off your disk. There are no compressed previews.
+Drop in a song — or paste a YouTube link and it fetches the audio itself — and
+you get a mixer, one lane per instrument:
 
-Downloads are your choice: **FLAC** (lossless) or **MP3** at 320 kbps, which is
-roughly a fifth the size. The MP3 is made the first time you ask for one and
-then kept, so nothing is encoded that you never wanted. On a 3-minute song a
-full set of stems is about 158 MB as FLAC and 36 MB as MP3.
+```
+▶  1:12 / 3:01  ━━━━━━━●────────────────
 
-## Links
-
-Paste a YouTube URL and it downloads the audio with yt-dlp, then separates it.
-Nothing is uploaded: the download happens on your machine and so does the
-separation.
-
-Two things worth knowing. YouTube changes its player regularly and yt-dlp needs
-updating when it does — if a link starts failing, the app says so and the fix is
-`./venv/bin/pip install -U yt-dlp`. And downloading from YouTube is against
-their terms of service; for practising along at home it's the same grey area as
-every tool of this kind, but that's the situation rather than a green light.
-
-## Setup (once)
-
-```bash
-./setup.sh
+Guitar   [M][S]  ▁▃▅▇▅▃▂▁▂▃▅▇▅▃▁   ──────●──  100%   save
+Vocals   [M][S]  ▁▂▃▅▃▂▁▁▂▃▅▃▂▁▁   ──────●──  100%   save
+Drums    [M][S]  ▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇   ──────●──  100%   save
+Bass     [M][S]  ▃▃▄▃▃▄▃▃▄▃▃▄▃▃▄   ──────●──  100%   save
+Piano            not played in this song
+Other    [M][S]  ▁▁▂▃▂▁▁▂▃▂▁▁▂▃▂   ──────●──  100%   save
 ```
 
-It installs ffmpeg and Python 3.11 through Homebrew, then the separation model.
-**About 800 MB.** That's PyTorch and the model itself — it has to be on the
-machine for the separation to happen here rather than on someone's server.
-There's nothing else in it: no web framework, no plotting library, no audio
-analysis toolkit.
+- **Mute the guitar and play over the rest**, or solo it to work the part out by ear.
+- **Click anywhere on a waveform** to play from there.
+- Instruments that aren't in the song are **labelled as absent**, rather than
+  handed to you as a silent file to wonder about.
+- **Download** any single instrument, all of them as a folder, or the exact mix
+  you've dialled in — as lossless FLAC or 320 kbps MP3.
 
-Python 3.11 is not optional. PyTorch's **last Intel-Mac build is 2.2.2**, which
-needs Python ≤ 3.12, so a plain `pip install demucs` fails on this machine.
-
-## Use
-
-```bash
-./make_app.sh
-```
-
-Puts **GuitarSplit** in your Applications folder. Double-click it — that's the
-whole interface. If it's already running it just reopens the tab instead of
-starting a second copy.
-
-`GuitarSplit.command` in this folder does the same thing without the icon.
+Playback in the page is always lossless, whatever format you choose to download.
 
 ## Why the backing track sounds like the record
 
-A mix here is not built by adding up the tracks you left on. It's built by
+This is the one idea in the project worth reading about.
+
+A mix here is **not** built by adding up the instruments you kept. It's built by
 **subtracting the ones you turned down from the original master**:
 
 ```
 mix = original − Σ (1 − faderᵢ) × trackᵢ
 ```
 
-Those look equivalent. They aren't. The separated tracks don't quite add back up
-to the record — the model can't account for everything. Summing throws that
-difference away; subtracting keeps it, so everything you didn't touch stays
-exactly as it was mastered, reverb tails and all.
+Those look equivalent. They are not. A separation model does not reconstruct a
+song perfectly — the separated tracks don't quite add back up to the record.
+Summing them throws that difference away; subtracting keeps it, so everything
+you didn't touch stays exactly as it was mastered, reverb tails and all.
 
-Measured on a real track: the leftover sits about 23 dB below the mix, and about
-three quarters of it is midrange. That's the difference between a backing track
-that sounds like the record and one that sounds thin.
+Measured on a real track: the residue the model can't account for sits about
+**23 dB below the mix**, and roughly **three quarters of it is midrange** —
+200–2000 Hz, precisely where a mix goes thin and phasey when you gut it.
 
-With every fader at 100%, this returns the original bit-for-bit.
+The property this buys you is checkable: **set every fader to 100% and the file
+you get back is bit-for-bit identical to your original.** Zero sample error.
 
-## Files
+## Install
 
-| | |
+Requires [Homebrew](https://brew.sh).
+
+```bash
+git clone https://github.com/dlrztrk00/guitar-splitter.git
+cd guitar-splitter
+./setup.sh          # installs ffmpeg, Python 3.11 and the model — about 800 MB
+./make_app.sh       # puts GuitarSplit in /Applications
+```
+
+Then double-click **GuitarSplit**. It starts the app and opens your browser.
+
+### Why Python 3.11 specifically
+
+Not a preference — a wall. **PyTorch's last macOS x86_64 build is 2.2.2**, which
+supports Python ≤ 3.12. A plain `pip install demucs` on an Intel Mac fails,
+because pip resolves to a newer torch that has no Intel wheel. `numba` and
+`llvmlite` have since dropped Intel builds too, and try to compile LLVM from
+source, which also fails. The pins in `requirements.txt` are the point of that
+file; don't "upgrade" them.
+
+Of the ~800 MB, **585 MB is PyTorch itself.** That's the price of running a
+neural network on your own machine instead of sending your music to a server.
+There is deliberately nothing else in it: no web framework — the server is
+Python's own `http.server` — and no audio-analysis toolkit.
+
+## How it works
+
+1. **ffmpeg** decodes your file at its own sample rate. The original is never
+   resampled.
+2. **Demucs `htdemucs_6s`** separates it into six sources. It is the one widely
+   available open model that emits **guitar** as its own track, which is the
+   entire reason this project exists.
+3. Each track is resampled back to the source rate and length-matched, so
+   subtraction is sample-exact.
+4. The mixer streams the lossless files directly, with HTTP range requests so
+   you can seek anywhere in the song.
+
+## Limits, honestly
+
+- **A 3-minute song takes about 3 minutes** on a 2018 quad-core i5. It runs at
+  roughly realtime on CPU; there is no GPU path on this hardware.
+- **Separation is not magic.** Guitar-forward recordings come out clean; dense
+  mixes leak between tracks, and a heavily processed guitar can end up partly in
+  `other`.
+- **Results are temporary.** Working files live in a temp folder and are deleted
+  when you quit, so nothing accumulates on disk. Download what you want before
+  closing.
+- **YouTube changes its player regularly** and `yt-dlp` needs updating when it
+  does. The app tells you when that has happened; the fix is
+  `./venv/bin/pip install -U yt-dlp`. Downloading from YouTube is also against
+  their terms of service — that's the situation, not an endorsement.
+
+## Layout
+
+| File | |
 |---|---|
-| `app.py` | the local server and job queue |
-| `audio.py` | loading, separation, mixing |
+| `app.py` | local server, job queue, downloads |
+| `audio.py` | decoding, separation, mixing |
 | `player.py` | the mixer — markup and behaviour |
 | `page.py` | the page around it |
-
-Working files live in a temp folder and are deleted when you quit. Songs you
-download go wherever your browser puts downloads.
+| `fetch.py` | pulling audio from a link |
+| `icon.py` | draws the app icon |
 
 ## Note
 
-Separating music you own for your own practice is ordinary personal use.
+Separating music you own, to practise along with, is ordinary personal use.
 Publishing separated stems is a different thing.
